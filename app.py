@@ -1,79 +1,52 @@
 import streamlit as st
-import pandas as pd
-import joblib
-
-# -------------------------
-# 💠 Background (Same Dark Orange + Blue Mix)
-# -------------------------
-st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(90deg, rgb(199,114,21), rgb(29,52,97));
-        background-size: cover;
-    }
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown("<h1 style='text-align: center; color: white;'>🏦 Loan Approval Prediction</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='text-align: center; color: white;'>An Intelligent System to Check Loan Eligibility</h4>", unsafe_allow_html=True)
+import numpy as np
+import pickle
 
 # Load model & scaler
-model = joblib.load("model.pkl")
-scaler = joblib.load("scaler.pkl")
+model = pickle.load(open('model.pkl', 'rb'))
+scaler = pickle.load(open('scaler.pkl', 'rb'))
 
-# Mappings
-gender_map = {"Male": 1, "Female": 0}
-married_map = {"Married": 1, "Not Married": 0}
-edu_map = {"Graduated": 1, "Not Graduated": 0}
-emp_map = {"Yes": 1, "No": 0}
-prop_map = {"Urban": 2, "Semiurban": 1, "Rural": 0}
+st.title("🏦 Loan Approval Prediction System")
 
-# -------------------------
-# LAYOUT (Left 4 – Right 4)
-# -------------------------
-left, right = st.columns(2)
+st.write("Fill the details below to check whether your loan will be approved.")
 
-with left:
-    Gender = st.selectbox("Gender", ["Male", "Female"])
-    Marriage = st.selectbox("Marital Status", ["Married", "Not Married"])
-    no_of_dep = st.slider("Number of Dependents", 0, 3)
-    grad = st.selectbox("Education Level", ["Graduated", "Not Graduated"])
+# ----- INPUT FORM -----
+gender = st.selectbox("Gender", ("Male", "Female"))
+married = st.selectbox("Married", ("Yes", "No"))
+dependents = st.selectbox("Dependents", (0, 1, 2, 3))
+education = st.selectbox("Education", ("Graduate", "Not Graduate"))
+self_emp = st.selectbox("Self Employed", ("Yes", "No"))
 
-with right:
-    self_emp = st.selectbox("Self Employed?", ["Yes", "No"])
-    Loan_Amount = st.slider("Loan Amount", 0, 1000)
-    Property_Area = st.selectbox("Property Area", ["Urban", "Semiurban", "Rural"])
-    Total_Income = st.slider("Total Income", 0, 10000)
+loan_amount = st.number_input("Loan Amount", min_value=10, max_value=500, step=1)
+property_area = st.selectbox("Property Area", ("Urban", "Semiurban", "Rural"))
 
-# -------------------------
-# Prediction Button
-# -------------------------
-if st.button("🔍 Predict Loan Status"):
+applicant_income = st.number_input("Applicant Income", min_value=0, step=100)
+coapplicant_income = st.number_input("Co-Applicant Income", min_value=0, step=100)
 
-    data = [[
-        gender_map[Gender],
-        married_map[Marriage],
-        no_of_dep,
-        edu_map[grad],
-        emp_map[self_emp],
-        Loan_Amount,
-        prop_map[Property_Area],
-        Total_Income,
-    ]]
+# Total Income feature
+total_income = applicant_income + coapplicant_income
 
-    df_input = pd.DataFrame(data, columns=[
-        "Gender", "Married", "Dependents", "Education",
-        "Self_Employed", "LoanAmount", "Property_Area", "Total_Income"
-    ])
+# ----- ENCODING -----
+gender = 1 if gender == "Male" else 0
+married = 1 if married == "Yes" else 0
+education = 1 if education == "Graduate" else 0
+self_emp = 1 if self_emp == "Yes" else 0
 
-    df_scaled = scaler.transform(df_input)
-    prediction = model.predict(df_scaled)[0]
+property_mapping = {"Urban": 2, "Semiurban": 1, "Rural": 0}
+property_area = property_mapping[property_area]
+
+# Prepare input data array
+input_data = np.array([[gender, married, dependents, education, self_emp,
+                        loan_amount, property_area, total_income]])
+
+# Scale the input
+scaled_data = scaler.transform(input_data)
+
+# ----- PREDICT -----
+if st.button("Check Loan Approval"):
+    prediction = model.predict(scaled_data)[0]
 
     if prediction == 1:
-        st.success("✅ Congratulations! Your Loan is Approved.")
+        st.success("🎉 **Loan Approved!**")
     else:
-        st.error("❌ Sorry! Your Loan is Rejected.")
+        st.error("❌ **Loan Rejected.**")
