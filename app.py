@@ -25,13 +25,6 @@ st.markdown("<h4 style='text-align: center; color: white;'>An Intelligent System
 model = joblib.load("model.pkl")
 scaler = joblib.load("scaler.pkl")
 
-# Mappings
-gender_map = {"Male": 1, "Female": 0}
-married_map = {"Married": 1, "Not Married": 0}
-edu_map = {"Graduated": 1, "Not Graduated": 0}
-emp_map = {"Yes": 1, "No": 0}
-prop_map = {"Urban": 2, "Semiurban": 1, "Rural": 0}
-
 # -------------------------
 # LAYOUT
 # -------------------------
@@ -45,27 +38,52 @@ with left:
 
 with right:
     self_emp = st.selectbox("Self Employed?", ["Yes", "No"])
-    Loan_Amount = st.slider("Loan Amount", 0, 1000)
+    Loan_Amount = st.slider("Loan Amount (×1000 TK)", 0, 80)  # max 80k
     Property_Area = st.selectbox("Property Area", ["Urban", "Semiurban", "Rural"])
-    Total_Income = st.slider("Total Income", 0, 10000)
+    Total_Income = st.slider("Total Income (×1000 TK)", 0, 10)  # max 10k
 
 # -------------------------
-# Custom Approval Logic (As You Requested)
+# Custom Approval Logic
 # -------------------------
 if st.button("🔍 Predict Loan Status"):
 
-    # Check if matches your required "approve" pattern
-    approved_condition = (
-        Gender == "Female" and
-        Marriage == "Married" and
-        no_of_dep == 0 and
-        grad == "Not Graduated" and
-        self_emp == "Yes" and
-        Property_Area == "Urban"
-    )
+    # -------------------------
+    # Dependents scoring
+    # -------------------------
+    dep_score = {0: 3, 1: 2, 2: 1, 3: 0}[no_of_dep]  # higher better
 
-    if approved_condition:
+    # -------------------------
+    # Education & Self Employed
+    # -------------------------
+    edu_score = 2 if grad == "Graduated" else 1
+    emp_score = 2 if self_emp == "Yes" else 1
+
+    # -------------------------
+    # Marital & Property
+    # -------------------------
+    marriage_score = 2 if Marriage == "Married" else 1
+    prop_score = {"Urban": 2, "Semiurban": 1, "Rural": 0}[Property_Area]
+
+    # -------------------------
+    # Income vs Loan check
+    # -------------------------
+    loan_amount_real = Loan_Amount * 1000  # convert to TK
+    total_income_real = Total_Income * 1000
+    income_condition = total_income_real >= 0.4 * loan_amount_real  # 40% rule
+
+    # -------------------------
+    # Total score
+    # -------------------------
+    total_score = dep_score + edu_score + emp_score + marriage_score + prop_score
+
+    # Approval thresholds
+    if total_score >= 8 and income_condition and loan_amount_real <= 80000:
         st.success("✅ Congratulations! Your Loan is Approved.")
     else:
         st.error("❌ Sorry! Your Loan is Rejected.")
 
+    # -------------------------
+    # Optional: Show details
+    # -------------------------
+    st.markdown(f"**Score Details:** Dependents({dep_score}) + Education({edu_score}) + Self Employed({emp_score}) + Marriage({marriage_score}) + Property({prop_score}) = **{total_score}**")
+    st.markdown(f"**Income vs Loan Check:** Total Income = {total_income_real} TK, Loan = {loan_amount_real} TK, Condition Met? {'✅' if income_condition else '❌'}")
